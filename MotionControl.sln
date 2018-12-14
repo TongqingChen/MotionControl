@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2050
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionControl", "source\MotionControl.csproj", "{B486C2C0-33D8-4CED-B501-24312A982EBE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MotionExample", "Example\MotionExample.csproj", "{075C9070-7BE6-4530-8EE4-AD68F4F299B4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B486C2C0-33D8-4CED-B501-24312A982EBE}.Debug|x64.ActiveCfg = Debug|x64
+		{B486C2C0-33D8-4CED-B501-24312A982EBE}.Debug|x64.Build.0 = Debug|x64
+		{B486C2C0-33D8-4CED-B501-24312A982EBE}.Release|x64.ActiveCfg = Release|x64
+		{B486C2C0-33D8-4CED-B501-24312A982EBE}.Release|x64.Build.0 = Release|x64
+		{075C9070-7BE6-4530-8EE4-AD68F4F299B4}.Debug|x64.ActiveCfg = Debug|x64
+		{075C9070-7BE6-4530-8EE4-AD68F4F299B4}.Debug|x64.Build.0 = Debug|x64
+		{075C9070-7BE6-4530-8EE4-AD68F4F299B4}.Release|x64.ActiveCfg = Release|x64
+		{075C9070-7BE6-4530-8EE4-AD68F4F299B4}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {89882CE9-250E-4CDD-B422-2FC58BBF2FA6}
+	EndGlobalSection
+EndGlobal
