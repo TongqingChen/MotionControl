@@ -376,7 +376,7 @@ namespace lhdevice
         [DllImport("lhmtc.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern short LH_CompareStatus(out short pStatus, out int pCount, bool resend);
         [DllImport("lhmtc.dll", CallingConvention = CallingConvention.Cdecl)]
-        public static extern short LH_CompareData(short encoder, short source, short pulseType, short startLevel, short time, out int pBuf1, short count1, out int pBuf2, short count2, bool resend);
+        public static extern short LH_CompareData(short encoder, short source, short pulseType, short startLevel, short time, ref int pBuf1, short count1, ref int pBuf2, short count2, bool resend);
         [DllImport("lhmtc.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern short LH_CompareLinear(short encoder, short channel, int startPos, int repeatTimes, int interval, short time, short source, bool resend);
         //自动回零

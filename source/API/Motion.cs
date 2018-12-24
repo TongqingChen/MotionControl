@@ -44,7 +44,11 @@ namespace MotionControl
         /// <summary>
         /// 轴不在同一张卡上
         /// </summary>
-        AxesNotInOneCard = -1005
+        AxesNotInOneCard = -1005,
+        /// <summary>
+        /// 回零未找到原点
+        /// </summary>
+        ORGNotFound = -1006
     }
     /// <summary>
     /// 回零方式
@@ -77,10 +81,20 @@ namespace MotionControl
     /// </summary>
     public struct HomePara
     {
+        /*
         /// <summary>
         /// 回零模式
         /// </summary>
         public HomeMode mode;
+        */
+        /// <summary>
+        /// 回零方向0-正方向回零，1-反方向回零
+        /// </summary>
+        public int direction;
+        /// <summary>
+        /// 反向搜索距离，单位mm
+        /// </summary>
+        public double maxSearchDistance;
         /// <summary>
         /// 加速度m/s^2
         /// </summary>
@@ -89,10 +103,6 @@ namespace MotionControl
         /// 速度m/s
         /// </summary>
         public double vel;
-        /// <summary>
-        /// 偏移量mm
-        /// </summary>
-        public double offset;
         /// <summary>
         /// 超时时间，单位s
         /// </summary>
@@ -251,47 +261,15 @@ namespace MotionControl
             }
         }
 
-        /// <summary>
-        /// 回零动作，阻塞等待完成
-        /// </summary>
-        /// <returns></returns>
-        public int Home()
+        private int home_(double searchPos)
         {
             int err_ = 0;
-            if (!online_)
+            
+            if ((err_ = lhmtc.LH_Home(id, _mm2pls(searchPos), _vel2pls(homePara.vel), _acc2pls(homePara.acc), 0, false)) != 0)
             {
-                cmdPos_ = fbkPos_ = 0;
-                return 0;
+                return err_;
             }
             int t_ = Environment.TickCount;
-            if ((err_ = lhmtc.LH_Home(id, Int32.MaxValue / 2, _vel2pls(homePara.vel), _acc2pls(homePara.acc), _mm2pls(homePara.offset), false)) < 0)
-            {
-                return err_;
-            }
-            do
-            {
-                Thread.Sleep(100);
-                if (Environment.TickCount - t_ > homePara.maxSeconds * 1000)
-                {
-                    return (int)Error.TimeOut;
-                }
-            } while (MIO.Moving);
-
-
-            if (!mio_.PEL)
-            {
-                return 0;
-            }
-            //如果触发了正限位，则执行第二次反向回零
-            if ((err_ = this.Reset()) != 0)
-            {
-                return err_;
-            }
-            t_ = Environment.TickCount;
-            if ((err_ = lhmtc.LH_Home(id, Int32.MinValue / 2, _vel2pls(homePara.vel), _acc2pls(homePara.acc), _mm2pls(homePara.offset), false)) != 0)
-            {
-                return err_;
-            }
             ushort pHomests = 0;
             do
             {
@@ -311,10 +289,7 @@ namespace MotionControl
                 if (pHomests == 1)//成功
                 {
                     Thread.Sleep(100);
-                    if ((err_ = lhmtc.LH_ZeroPos(id, 1, false)) != 0)
-                    {
-                        return err_;
-                    }
+                    return this.ZeroPos();
                 }
                 else if (pHomests == 0)
                 {
@@ -322,16 +297,39 @@ namespace MotionControl
                 }
                 else
                 {
-                    return 1; //失败
+                    break;
                 }
+            } while (true);
+            return (int)Error.ORGNotFound;
+        }
 
-            } while (pHomests == 0);
-
-            if (MIO.NEL)
+        /// <summary>
+        /// 回零动作，阻塞等待完成（先按设置方向反向搜索一段距离maxSearchDistance，如果未搜到，按设置方向一直搜索，搜到则成功，未搜到则报错）
+        /// </summary>
+        /// <returns></returns>
+        public int Home()
+        {
+            int err_ = 0;
+            if (!online_)
             {
-                return (int)Error.NEL;
+                cmdPos_ = fbkPos_ = 0;
+                return 0;
             }
-            return err_;
+            int dir_ = (homePara.direction == 0) ? 1 : -1;
+            err_ = home_(-dir_ * homePara.maxSearchDistance);
+            //如果找到了原点，则默认再走出16mm
+            if (err_ == 0)
+            {
+                if ((err_ = this.RelMoveOver(-16.0 * dir_)) != 0)
+                {
+                    return err_;
+                }
+            }
+            else if (err_ != (int)Error.ORGNotFound)
+            {
+                return err_;
+            }
+            return home_(dir_ * 100000);
         }
         /// <summary>
         /// 当前位置设为原点(谨慎使用，设为原点后，新的运动坐标系将以该点为起点)
@@ -424,62 +422,78 @@ namespace MotionControl
         {
             int err_ = 0;
             double pos_ = pos;
-            if (online_)
+            if (!online_)
             {
-                var p_ = new lhmtc.TrapPrfPrm
-                {
-                    acc = _acc2pls(mp.acc),
-                    dec = _acc2pls(mp.acc),
-                    velStart = 0,
-                    smoothTime = 10
-                };
-                if ((err_ = lhmtc.LH_PrfTrap(id, false)) != 0)
-                {
-                    return err_;
-                }
-
-                if ((err_ = lhmtc.LH_SetTrapPrm(id, ref p_, false)) != 0)
-                {
-                    return err_;
-                }
                 if (!abs)
                 {
-                    pos_ += FbkPos;
+                    pos_ += fbkPos_;
                 }
-                if ((err_ = lhmtc.LH_SetPos(id, _mm2pls(pos_), false)) != 0)
-                {
-                    return err_;
-                }
-                if ((err_ = lhmtc.LH_SetVel(id, _vel2pls(mp.maxVel), false)) != 0)
-                {
-                    return err_;
-                }
-                if ((err_ = lhmtc.LH_Update(1 << (id - 1), false)) != 0)
-                {
-                    return err_;
-                }
+                cmdPos_ = fbkPos_ = pos_;
+                return 0;
             }
-            else
+            var p_ = new lhmtc.TrapPrfPrm
             {
-                cmdPos_ = fbkPos_ = pos;
+                acc = _acc2pls(mp.acc),
+                dec = _acc2pls(mp.acc),
+                velStart = 0,
+                smoothTime = 10
+            };
+            if ((err_ = lhmtc.LH_PrfTrap(id, false)) != 0)
+            {
+                return err_;
+            }
+
+            if ((err_ = lhmtc.LH_SetTrapPrm(id, ref p_, false)) != 0)
+            {
+                return err_;
+            }
+            if (!abs)
+            {
+                pos_ += FbkPos;
+            }
+            if ((err_ = lhmtc.LH_SetPos(id, _mm2pls(pos_), false)) != 0)
+            {
+                return err_;
+            }
+            if ((err_ = lhmtc.LH_SetVel(id, _vel2pls(mp.maxVel), false)) != 0)
+            {
+                return err_;
+            }
+            if ((err_ = lhmtc.LH_Update(1 << (id - 1), false)) != 0)
+            {
+                return err_;
             }
             return 0;
         }
         /// <summary>
-        /// 设置触发位置并启动位置监控
+        /// 设置两个通道触发位置并启动位置监控
         /// </summary>
-        /// <param name="channel0_1">通道，0或1</param>
-        /// <param name="posList">相对位置列表，单位mm, 注意是当前位置的相对距离，如向负方向运动，则可以设置-1,-3,-5.8, ...等</param>
+        /// <param name="channel0_posList">通道0触发位置列表, 绝对位置，单位mm</param>
+        /// <param name="channel1_posList">通道1触发位置列表, 绝对位置，单位mm</param>
         /// <returns>0表示成功，非零表示错误</returns>
-        public int TriggerData(int channel0_1, List<double> posList)
+        public int TriggerData(List<double> channel0_posList, List<double> channel1_posList)
         {
             if (!online_)
             {
                 return 0;
             }
+            int pos0_count = channel0_posList.Count;
+            int[] pos0_ = new int[pos0_count];
+            for (int i = 0; i < pos0_count; i++)
+            {
+                pos0_[i] = _mm2pls(channel0_posList[i]);
+            }
+            int pos1_count = channel1_posList.Count;
+            int[] pos1_ = new int[pos1_count];
+            for (int i = 0; i < pos1_count; i++)
+            {
+                pos1_[i] = _mm2pls(channel1_posList[i]);
+            }
+            return lhmtc.LH_CompareData(id, 1, 0, 0, pulseWidth_, ref pos0_[0], (short)pos0_count, ref pos1_[0], (short)pos1_count, false);
+            /*
             int err_ = 0;
             short ch_ = (short)channel0_1;
-
+            
             //1. 清除
             if ((err_ = lhmtc.LH_2DCompareStop(ch_)) != 0)
             {
@@ -505,7 +519,7 @@ namespace MotionControl
                 outputType = 0, //脉冲
                 time = pulseWidth_,
                 startLevel = 1,
-                maxerr = 300,
+                maxerr = 200,
                 threshold = 10,
                 pluseCount = 1,
                 spacetime = 200
@@ -517,14 +531,13 @@ namespace MotionControl
             //4.设置数据
             int num_ = posList.Count;
             lhmtc.T2DCompareData[] data_ = new lhmtc.T2DCompareData[num_];
-            //     double crt_ = 0;
-            //    lhmtc.LH_GetEncPos(id, out crt_, 1, false);
+            double crt_ = 0;
+            lhmtc.LH_GetEncPos(id, out crt_, 1, false);
             for (int i = 0; i < num_; i++)
             {
-                data_[i].px = _mm2pls(posList[i]);
+                data_[i].px = (int)(posList[i]*plsPerMm-crt_);
                 data_[i].py = 0;
             }
-            //IntPtr ptr_ = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(lhmtc.T2DCompareData)) * num_);
             if ((err_ = lhmtc.LH_2DCompareData(ch_, (short)num_, ref data_[0], 0)) != 0)
             {
                 return err_;
@@ -537,13 +550,37 @@ namespace MotionControl
             }
             //5. 启动比较功能            
             return (err_ = lhmtc.LH_2DCompareStart(ch_));
+            */
+        }
+
+        /// <summary>
+        /// 设置两个通道跟随模式触发位置并启动位置监控
+        /// </summary>
+        /// <param name="channel0_posList">通道0触发位置列表, 绝对位置，单位mm</param>
+        /// <param name="offset_channel1to0">通道1触发位置相对通道0触发位置偏移量，单位mm</param>
+        /// <returns>0表示成功，非零表示错误</returns>
+        public int TriggerData(List<double> channel0_posList, double offset_channel1to0)
+        {
+            if (!online_)
+            {
+                return 0;
+            }
+            int pos0_count = channel0_posList.Count;
+            int[] pos0_ = new int[pos0_count];
+            int[] pos1_ = new int[pos0_count];
+            for (int i = 0; i < pos0_count; i++)
+            {
+                pos0_[i] = _mm2pls(channel0_posList[i]);
+                pos1_[i] = _mm2pls(channel0_posList[i] + offset_channel1to0);
+            }
+            return lhmtc.LH_CompareData(id, 1, 0, 0, pulseWidth_, ref pos0_[0], (short)pos0_count, ref pos1_[0], (short)pos0_count, false);
         }
         /// <summary>
         /// 设置线性触发位置，并启动位置监控
         /// </summary>
         /// <param name="channel0_1">通道，0或1</param>
         /// <param name="startPos">起始点，绝对位置，单位mm</param>
-        /// <param name="interval">间距，单位mm，可以为负值</param>
+        /// <param name="interval">间距，单位mm，如果设置往负方向等间距触发，则为负值</param>
         /// <param name="trigCnt">触发次数</param>
         /// <returns>0表示成功，非零表示错误</returns>
         public int TriggerLinear(int channel0_1, double startPos, double interval, int trigCnt)
@@ -552,21 +589,69 @@ namespace MotionControl
             {
                 return 0;
             }
-            int err_ = lhmtc.LH_CompareLinear(id, (short)channel0_1, _mm2pls(startPos), trigCnt, _mm2pls(interval), pulseWidth_, 1, false);
-            return err_;
+            return lhmtc.LH_CompareLinear(id, (short)(channel0_1), _mm2pls(startPos), trigCnt, _mm2pls(interval), pulseWidth_, 1, false);
         }
         /// <summary>
-        /// 停止位置出发指令
+        /// 设置两通道分别线性触发位置，并启动位置监控
         /// </summary>
-        /// /// <param name="channel0_1">通道号,取值0或1</param>
-        /// <returns>0表示成功，负值表示错误码</returns>
-        public int TriggerStop(int channel0_1)
+        /// <param name="startPos">两个触发通道的起始点，绝对位置，单位mm</param>
+        /// <param name="interval">间距，单位mm，如果设置往负方向等间距触发，则为负值</param>
+        /// <param name="trigCnt">触发次数</param>
+        /// <returns>0表示成功，非零表示错误</returns>
+        public int TriggerLinear(Point2d startPos, Point2d interval, Point2i trigCnt)
         {
             if (!online_)
             {
                 return 0;
             }
-            return lhmtc.LH_2DCompareStop((short)channel0_1); ;
+            int[] pBuf1 = new int[trigCnt.x];
+            for (int i = 0; i < trigCnt.x; i++)
+            {
+                pBuf1[i] = _mm2pls(startPos.x + interval.x * i);
+            }
+            int[] pBuf2 = new int[trigCnt.y];
+            for (int i = 0; i < trigCnt.y; i++)
+            {
+                pBuf2[i] = _mm2pls(startPos.y + interval.y * i);
+            }
+            return lhmtc.LH_CompareData(id, 1, 0, 0, pulseWidth_, ref pBuf1[0], (short)trigCnt.x, ref pBuf2[0], (short)trigCnt.y, false);
+        }
+
+        /// <summary>
+        /// 设置两通道线性触发位置，两通道按一定位置间隔同步触发，并启动位置监控
+        /// </summary>
+        /// <param name="startPos">通道0的起始点，绝对位置，单位mm</param>
+        /// <param name="interval">间距，单位mm，如果设置往负方向等间距触发，则为负值</param>
+        /// <param name="trigCnt">触发次数</param>
+        /// <param name="offset_channel1to0">通道1相对通道0点偏移</param>
+        /// <returns>0表示成功，非零表示错误</returns>
+        public int TriggerLinear(double startPos, double interval, int trigCnt, double offset_channel1to0)
+        {
+            if (!online_)
+            {
+                return 0;
+            }
+            int[] pBuf1 = new int[trigCnt];
+            int[] pBuf2 = new int[trigCnt];
+            for (int i = 0; i < trigCnt; i++)
+            {
+                pBuf1[i] = _mm2pls(startPos + interval * i);
+                pBuf2[i] = _mm2pls(startPos + interval * i + offset_channel1to0);
+            }
+            return lhmtc.LH_CompareData(id, 1, 0, 0, pulseWidth_, ref pBuf1[0], (short)trigCnt, ref pBuf2[0], (short)trigCnt, false);
+        }
+
+        /// <summary>
+        /// 停止位置出发指令
+        /// </summary>
+        /// <returns>0表示成功，负值表示错误码</returns>
+        public int TriggerStop()
+        {
+            if (!online_)
+            {
+                return 0;
+            }
+            return lhmtc.LH_CompareStop(); ;
         }
         /// <summary>
         /// 软触发
@@ -584,7 +669,7 @@ namespace MotionControl
             int err_ = 0, cnt_ = 0;
             short bufCnt_ = 0, sts_ = 0, fifo_ = 0, fifoCnt_ = 0;
             //先停止之前的触发
-            if ((err_ = TriggerStop(channel0_1)) < 0)
+            if ((err_ = TriggerStop()) < 0)
             {
                 return err_;
             }
@@ -600,12 +685,12 @@ namespace MotionControl
         /// <returns>0表示成功，负值表示错误码</returns>
         public int ClearAlarm()
         {
-            if (online_)
+            if (!online_)
             {
-                return lhmtc.LH_ClrSts(id, 1, false);
+                mio_.Alarm = false;
+                return 0;
             }
-            mio_.Alarm = false;
-            return 0;
+            return lhmtc.LH_ClrSts(id, 1, false);
         }
         /// <summary>
         /// 阻塞检测运动完成
@@ -650,30 +735,151 @@ namespace MotionControl
             return ret_;
         }
 
-        // m/s^2 -> pulse/ms^2
-        internal double _acc2pls(double mpss)
+        // mm/s^2 -> pulse/ms^2
+        internal double _acc2pls(double mmpss)
         {
-            return mpss * plsPerMm / 1000.0;
+            return mmpss * plsPerMm / 1000000.0;
         }
         // mm -> pulse
         internal int _mm2pls(double mm)
         {
             return (int)(mm * this.plsPerMm);
         }
-        // m/s -> pulse/ms
-        internal double _vel2pls(double mps)
+        // mm/s -> pulse/ms
+        internal double _vel2pls(double mmps)
         {
-            return mps * this.plsPerMm;
+            return mmps * this.plsPerMm / 1000.0;
         }
 
     }
     /// <summary>
-    /// XY两坐标系
+    /// XY两坐标系，XY仅为了区分两个坐标，与实际坐标系的XY顺序不一定吻合
+    /// </summary>
+    public struct Point2<T>
+    {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
+        public T x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
+        public T y;
+        /// <summary>
+        /// 使用初始值构造实例
+        /// </summary>
+        /// <param name="x_">第一坐标值</param>
+        /// <param name="y_">第二坐标值</param>
+        public Point2(T x_, T y_)
+        {
+            x = x_;
+            y = y_;
+        }
+    }
+    /// <summary>
+    /// XYZ三坐标系，XYZ仅为了区分三个坐标，与实际坐标系的XYZ顺序不一定吻合
+    /// </summary>
+    public struct Point3<T>
+    {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
+        public T x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
+        public T y;
+        /// <summary>
+        /// 第三坐标
+        /// </summary>
+        public T z;
+        /// <summary>
+        /// 创建新的实例，并初始化
+        /// </summary>
+        /// <param name="x_">x值</param>
+        /// <param name="y_">y值</param>
+        /// <param name="z_">z值</param>
+        public Point3(T x_, T y_, T z_)
+        {
+            x = x_;
+            y = y_;
+            z = z_;
+        }
+    }
+
+    /// <summary>
+    /// XY两坐标系，XY仅为了区分两个坐标，与实际坐标系的XY顺序不一定吻合
+    /// </summary>
+    public struct Point2i
+    {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
+        public int x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
+        public int y;
+        /// <summary>
+        /// 使用初始值构造实例
+        /// </summary>
+        /// <param name="x_">第一坐标值</param>
+        /// <param name="y_">第二坐标值</param>
+        public Point2i(int x_, int y_)
+        {
+            x = x_;
+            y = y_;
+        }
+    }
+    /// <summary>
+    /// XYZ三坐标系，XYZ仅为了区分三个坐标，与实际坐标系的XYZ顺序不一定吻合
+    /// </summary>
+    public struct Point3i
+    {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
+        public int x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
+        public int y;
+        /// <summary>
+        /// 第三坐标
+        /// </summary>
+        public int z;
+        /// <summary>
+        /// 创建新的实例，并初始化
+        /// </summary>
+        /// <param name="x_">x值</param>
+        /// <param name="y_">y值</param>
+        /// <param name="z_">z值</param>
+        public Point3i(int x_, int y_, int z_)
+        {
+            x = x_;
+            y = y_;
+            z = z_;
+        }
+    }
+
+    /// <summary>
+    /// XY两坐标系，XY仅为了区分两个坐标，与实际坐标系的XY顺序不一定吻合
     /// </summary>
     public struct Point2d
     {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
         public double x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
         public double y;
+        /// <summary>
+        /// 使用初始值构造实例
+        /// </summary>
+        /// <param name="x_">第一坐标值</param>
+        /// <param name="y_">第二坐标值</param>
         public Point2d(double x_, double y_)
         {
             x = x_;
@@ -681,12 +887,21 @@ namespace MotionControl
         }
     }
     /// <summary>
-    /// XYZ三坐标系
+    /// XYZ三坐标系，XYZ仅为了区分三个坐标，与实际坐标系的XYZ顺序不一定吻合
     /// </summary>
     public struct Point3d
     {
+        /// <summary>
+        /// 第一坐标
+        /// </summary>
         public double x;
+        /// <summary>
+        /// 第二坐标
+        /// </summary>
         public double y;
+        /// <summary>
+        /// 第三坐标
+        /// </summary>
         public double z;
         /// <summary>
         /// 创建新的实例，并初始化
@@ -701,6 +916,7 @@ namespace MotionControl
             z = z_;
         }
     }
+
     /// <summary>
     /// 数字IO类，包含信息和方法
     /// </summary>
@@ -744,7 +960,7 @@ namespace MotionControl
                     {
                         lhmtc.LH_GetDi(4, out v, false);
                     }
-                    bit_ = ((v & (1 << bitNo)) != 0);
+                    bit_ = ((v & (1 << bitNo)) == 0);
                 }
                 return bit_;
             }
@@ -754,7 +970,7 @@ namespace MotionControl
                 {
                     if (this.ouput)
                     {
-                        lhmtc.LH_SetDoBit(bitNo, (short)(value ? 1 : 0), false);
+                        lhmtc.LH_SetDoBit((short)(bitNo+1), (short)(value ? 0 : 1), false);
                     }
                 }
                 else
@@ -770,6 +986,10 @@ namespace MotionControl
     /// </summary>
     public class Motion
     {
+        /// <summary>
+        /// 版本信息，由版本号和更新日期组成
+        /// </summary>
+        public static String Version { get { return "v0.3_2018.12.24"; } }
         private static string configFileFolder_ = string.Empty;
         private static List<Axis> axisList_ = new List<Axis>();
         private static List<DIO> dioList_ = new List<DIO>();
@@ -866,7 +1086,7 @@ namespace MotionControl
                     return err_;
                 }
             }
-            foreach(var i in dioList_)
+            foreach (var i in dioList_)
             {
                 i.online_ = online_;
             }
@@ -886,29 +1106,26 @@ namespace MotionControl
         /// <summary>
         /// 两轴绝对位置移动指令，不检测完成，调用Axis类中AbsMove方法
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
+        /// <param name="axis">轴号1，0-based</param>
         /// <param name="pos">目标位置，单位mm</param>
         /// <param name="spd_ratio">运动速率，正数，可以大于1</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int AbsMove(int axis1, int axis2, ref Point2d pos, double spd_ratio = 1.0)
+        public static int AbsMove(Point2i axis, Point2d pos, double spd_ratio = 1.0)
         {
-            var axis_ = new List<int>() { axis1, axis2 };
+            var axis_ = new List<int>() { axis.x, axis.y };
             var pos_ = new List<double>() { pos.x, pos.y };
             return AbsMove(axis_, pos_, spd_ratio);
         }
         /// <summary>
         /// 三轴绝对位置移动指令，不检测完成，调用Axis类中AbsMove方法
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
-        /// <param name="axis3">轴号3，0-based</param>
+        /// <param name="axis">轴号，0-based</param>
         /// <param name="pos">目标位置，单位mm</param>
         /// <param name="spd_ratio">运动速率，正数，可以大于1</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int AbsMove(int axis1, int axis2, int axis3, ref Point3d pos, double spd_ratio)
+        public static int AbsMove(Point3i axis, Point3d pos, double spd_ratio)
         {
-            var axis_ = new List<int>() { axis1, axis2, axis3 };
+            var axis_ = new List<int>() { axis.x, axis.x, axis.x };
             var pos_ = new List<double>() { pos.x, pos.y, pos.z };
             return AbsMove(axis_, pos_, spd_ratio);
         }
@@ -945,29 +1162,26 @@ namespace MotionControl
         /// <summary>
         /// 两轴绝对运动+阻塞检测完成，调用Axis类中的AbsMove + Done方法
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
+        /// <param name="axis">轴号，0-based</param>
         /// <param name="pos">目标位置，单位mm</param>
         /// <param name="spd_ratio">运动速率，正数，可以大于1</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int AbsMoveOver(int axis1, int axis2, ref Point2d pos, double spd_ratio = 1.0)
+        public static int AbsMoveOver(Point2i axis, Point2d pos, double spd_ratio = 1.0)
         {
-            var axis_ = new List<int>() { axis1, axis2 };
+            var axis_ = new List<int>() { axis.x, axis.y };
             var pos_ = new List<double>() { pos.x, pos.y };
             return AbsMoveOver(axis_, pos_, spd_ratio);
         }
         /// <summary>
         /// 三轴绝对位置移动指令，阻塞检测完成，调用Axis类中AbsMove+Done方法
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
-        /// <param name="axis3">轴号3，0-based</param>
+        /// <param name="axis">轴号，0-based</param>
         /// <param name="pos">目标位置，单位mm</param>
         /// <param name="spd_ratio">运动速率，正数，可以大于1</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int AbsMoveOver(int axis1, int axis2, int axis3, ref Point3d pos, double spd_ratio)
+        public static int AbsMoveOver(Point3i axis, Point3d pos, double spd_ratio)
         {
-            var axis_ = new List<int>() { axis1, axis2, axis3 };
+            var axis_ = new List<int>() { axis.x, axis.y, axis.z };
             var pos_ = new List<double>() { pos.x, pos.y, pos.z };
             return AbsMoveOver(axis_, pos_, spd_ratio);
         }
@@ -1000,24 +1214,21 @@ namespace MotionControl
         /// <summary>
         /// 两轴阻塞检测运动完成函数，调用Axis类中的MotionDone函数
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
+        /// <param name="axis">轴号，0-based</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int MotionDone(int axis1, int axis2)
+        public static int MotionDone(Point2i axis)
         {
-            var axis_ = new List<int>() { axis1, axis2 };
+            var axis_ = new List<int>() { axis.x, axis.y };
             return MotionDone(axis_);
         }
         /// <summary>
         /// 三轴阻塞检测运动完成函数，调用Axis类中的MotionDone函数
         /// </summary>
-        /// <param name="axis1">轴号1，0-based</param>
-        /// <param name="axis2">轴号2，0-based</param>
-        /// <param name="axis3">轴号3，0-based</param>
+        /// <param name="axis">轴号，0-based</param>
         /// <returns>0表示成功，非0值表示错误码</returns>
-        public static int MotionDone(int axis1, int axis2, int axis3)
+        public static int MotionDone(Point3i axis)
         {
-            var axis_ = new List<int>() { axis1, axis2, axis3 };
+            var axis_ = new List<int>() { axis.x, axis.y, axis.z };
             return MotionDone(axis_);
         }
         /// <summary>
@@ -1041,30 +1252,29 @@ namespace MotionControl
         /// <summary>
         /// 两轴直线插补运动指令，不检测完成
         /// </summary>
-        /// <param name="id1">轴1ID, 0-based</param>
-        /// <param name="id2">轴2ID, 0-based</param>
+        /// <param name="axis">轴ID, 0-based</param>
         /// <param name="pos">目标位置</param>
         /// <param name="resultantVel">运动合速度，单位m/s</param>
         /// <param name="resultantAcc">运动合加速度，单位m/s^2</param>
         /// <returns>0表示成功，负值表示错误码</returns>
-        public static int Line(int id1, int id2, ref Point2d pos, double resultantVel, double resultantAcc)
+        public static int Line(Point2i axis, Point2d pos, double resultantVel, double resultantAcc)
         {
             int err_ = 0;
             if (!online_)
             {
                 return 0;
             }
-            if (!_isIdNormal(id1) || !_isIdNormal(id2))
+            if (!_isIdNormal(axis.x) || !_isIdNormal(axis.y))
             {
                 return (int)(Error.IdOutOfRange);
             }
-            if (axisList_[id1].cardId != axisList_[id2].cardId)
+            if (axisList_[axis.x].cardId != axisList_[axis.y].cardId)
             {
                 return (int)(Error.AxesNotInOneCard);
             }
             lhmtc.CrdCfg crdCfg_ = new lhmtc.CrdCfg();
             crdCfg_.dimension = 2;
-            crdCfg_.profile = new short[8] { axisList_[id1].id, axisList_[id2].id, 0, 0, 0, 0, 0, 0 };
+            crdCfg_.profile = new short[8] { axisList_[axis.x].id, axisList_[axis.y].id, 0, 0, 0, 0, 0, 0 };
             crdCfg_.orignPos = new int[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
             crdCfg_.setOriginFlag = 1;
             crdCfg_.evenTime = 10;
@@ -1082,8 +1292,8 @@ namespace MotionControl
                 return err_;
             }
             if ((err_ = lhmtc.LH_LnXY(crdSys_,
-                axisList_[id1]._mm2pls(pos.x), axisList_[id2]._mm2pls(pos.y),
-                axisList_[id1]._vel2pls(resultantVel), axisList_[id1]._acc2pls(resultantAcc),
+                axisList_[axis.x]._mm2pls(pos.x), axisList_[axis.y]._mm2pls(pos.y),
+                axisList_[axis.x]._vel2pls(resultantVel), axisList_[axis.x]._acc2pls(resultantAcc),
                 0, fifo_)) != 0)
             {
                 return err_;
@@ -1097,33 +1307,31 @@ namespace MotionControl
         /// <summary>
         /// 三轴直线插补运动指令，不检测完成
         /// </summary>
-        /// <param name="id1">轴1ID, 0-based</param>
-        /// <param name="id2">轴2ID, 0-based</param>
-        /// <param name="id3">轴3ID, 0-based</param>
+        /// <param name="axis">轴ID, 0-based</param>
         /// <param name="pos">目标位置</param>
         /// <param name="resultantVel">运动合速度，单位m/s</param>
         /// <param name="resultantAcc">运动合加速度，单位m/s^2</param>
         /// <returns>0表示成功，非零值表示错误码</returns>
-        public static int Line(int id1, int id2, int id3, ref Point3d pos, double resultantVel, double resultantAcc)
+        public static int Line(Point3i axis, Point3d pos, double resultantVel, double resultantAcc)
         {
             int err_ = 0;
             if (!online_)
             {
                 return 0;
             }
-            if (!_isIdNormal(id1) || !_isIdNormal(id2) || !_isIdNormal(id3))
+            if (!_isIdNormal(axis.x) || !_isIdNormal(axis.y) || !_isIdNormal(axis.z))
             {
                 return (int)(Error.IdOutOfRange);
             }
-            if (axisList_[id1].cardId != axisList_[id2].cardId ||
-                axisList_[id1].cardId != axisList_[id3].cardId ||
-                axisList_[id2].cardId != axisList_[id3].cardId)
+            if (axisList_[axis.x].cardId != axisList_[axis.y].cardId ||
+                axisList_[axis.x].cardId != axisList_[axis.z].cardId ||
+                axisList_[axis.y].cardId != axisList_[axis.z].cardId)
             {
                 return (int)(Error.AxesNotInOneCard);
             }
             lhmtc.CrdCfg crdCfg_ = new lhmtc.CrdCfg();
             crdCfg_.dimension = 3;
-            crdCfg_.profile = new short[8] { axisList_[id1].id, axisList_[id2].id, axisList_[id3].id, 0, 0, 0, 0, 0 };
+            crdCfg_.profile = new short[8] { axisList_[axis.x].id, axisList_[axis.y].id, axisList_[axis.z].id, 0, 0, 0, 0, 0 };
             crdCfg_.orignPos = new int[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
             crdCfg_.setOriginFlag = 1;
             crdCfg_.evenTime = 10;
@@ -1142,8 +1350,8 @@ namespace MotionControl
             }
 
             if ((err_ = lhmtc.LH_LnXYZ(crdSys_,
-                axisList_[id1]._mm2pls(pos.x), axisList_[id2]._mm2pls(pos.y), axisList_[id3]._mm2pls(pos.z),
-                axisList_[id1]._vel2pls(resultantVel), axisList_[id1]._acc2pls(resultantAcc),
+                axisList_[axis.x]._mm2pls(pos.x), axisList_[axis.y]._mm2pls(pos.y), axisList_[axis.z]._mm2pls(pos.z),
+                axisList_[axis.x]._vel2pls(resultantVel), axisList_[axis.x]._acc2pls(resultantAcc),
                 0, fifo_)) != 0)
             {
                 return err_;
@@ -1193,18 +1401,16 @@ namespace MotionControl
         /// <summary>
         /// 三轴直线插补运动，发指令后，阻塞检测完成。
         /// </summary>
-        /// <param name="id1">轴1，0-based</param>
-        /// <param name="id2">轴2，0-based</param>
-        /// <param name="id3">轴3，0-based</param>
+        /// <param name="axis">轴ID，0-based</param>
         /// <param name="pos">目标位置</param>
         /// <param name="resultantVel">运动合速度，单位m/s</param>
         /// <param name="resultantAcc">运动合加速度，单位m/s^2</param>
         /// <param name="maxSeconds">最大检测完成时间，超时时间，单位秒</param>
         /// <returns>0表示成功，非零值表示错误码</returns>
-        public static int LineOver(int id1, int id2, int id3, ref Point3d pos, double resultantVel, double resultantAcc, double maxSeconds = 20)
+        public static int LineOver(Point3i axis, Point3d pos, double resultantVel, double resultantAcc, double maxSeconds = 20)
         {
             int err_ = 0;
-            if ((err_ = Line(id1, id2, id3, ref pos, resultantVel, resultantAcc)) != 0)
+            if ((err_ = Line(axis, pos, resultantVel, resultantAcc)) != 0)
             {
                 return err_;
             }
@@ -1214,17 +1420,16 @@ namespace MotionControl
         /// <summary>
         /// 两轴直线插补运动，发指令后，阻塞检测完成。
         /// </summary>
-        /// <param name="id1">轴1，0-based</param>
-        /// <param name="id2">轴2，0-based</param>
+        /// <param name="axis">轴1，0-based</param>
         /// <param name="pos">目标位置</param>
         /// <param name="resultantVel">运动合速度，单位m/s</param>
         /// <param name="resultantAcc">运动合加速度，单位m/s^2</param>
         /// <param name="maxSeconds">最大检测完成时间，超时时间，单位秒</param>
         /// <returns>0表示成功，非零值表示错误码</returns>
-        public static int LineOver(int id1, int id2, ref Point2d pos, double resultantVel, double resultantAcc, double maxSeconds = 20)
+        public static int LineOver(Point2i axis, Point2d pos, double resultantVel, double resultantAcc, double maxSeconds = 20)
         {
             int err_ = 0;
-            if ((err_ = Line(id1, id2, ref pos, resultantVel, resultantAcc)) != 0)
+            if ((err_ = Line(axis, pos, resultantVel, resultantAcc)) != 0)
             {
                 return err_;
             }
@@ -1242,8 +1447,8 @@ namespace MotionControl
         /// <summary>
         /// IO数量
         /// </summary>
-        public static int DioNum { get => dioList_.Count; }
-        
+        public static int DioNum { get { return dioList_.Count; } }
+
         #endregion
         /// <summary>
         /// 释放系统资源，包括轴使能关闭，办卡关闭等
@@ -1276,7 +1481,7 @@ namespace MotionControl
             if (string.IsNullOrEmpty(paraFile))
             {
                 file_ = Path.Combine(configFileFolder_, "axis.xml");
-            }            
+            }
             _xmlSerialToFile(axisList_, file_);
         }
         /// <summary>
@@ -1289,7 +1494,7 @@ namespace MotionControl
             if (string.IsNullOrEmpty(paraFile))
             {
                 file_ = Path.Combine(configFileFolder_, "dio.xml");
-            }            
+            }
             _xmlSerialToFile(dioList_, file_);
         }
         #region 参数序列化读写操作

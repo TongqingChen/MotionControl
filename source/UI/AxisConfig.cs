@@ -23,16 +23,18 @@ namespace MotionControl
             this.textBox_Id.Text = axis.id.ToString();
             this.textBox_Name.Text = axis.name;
             this.textBox_Pulse.Text = axis.plsPerMm.ToString();
+            
+            this.comboBox_Dir.SelectedIndex = axis.homePara.direction;
+            this.textBox_MaxSearch.Text = axis.homePara.maxSearchDistance.ToString("F3");
 
-            this.comboBox_Home.SelectedIndex = (int)axis.homePara.mode;
-            this.textBox_HomeAcc.Text = axis.homePara.acc.ToString();
-            this.textBox_HomeVel.Text = axis.homePara.vel.ToString();
-            this.textBox_Offset.Text = axis.homePara.offset.ToString();
-            this.textBox_HomeTimeout.Text = axis.homePara.maxSeconds.ToString();
 
-            this.textBox_Acc.Text = axis.motionPara.acc.ToString();
-            this.textBox_Vel.Text = axis.motionPara.maxVel.ToString();
-            this.textBox_Timeout.Text = axis.motionPara.maxSeconds.ToString();            
+            this.textBox_HomeAcc.Text = axis.homePara.acc.ToString("F3");
+            this.textBox_HomeVel.Text = axis.homePara.vel.ToString("F3");
+            this.textBox_HomeTimeout.Text = axis.homePara.maxSeconds.ToString("F1");
+
+            this.textBox_Acc.Text = axis.motionPara.acc.ToString("F3");
+            this.textBox_Vel.Text = axis.motionPara.maxVel.ToString("F3");
+            this.textBox_Timeout.Text = axis.motionPara.maxSeconds.ToString("F1");            
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -43,11 +45,10 @@ namespace MotionControl
                 axis.id = (short)Convert.ToInt32(this.textBox_Id.Text);
                 axis.name = this.textBox_Name.Text;
                 axis.plsPerMm = Convert.ToDouble(this.textBox_Pulse.Text);
-                axis.homePara.mode = (HomeMode)(this.comboBox_Home.SelectedIndex);
-
+                axis.homePara.direction = this.comboBox_Dir.SelectedIndex;
+                axis.homePara.maxSearchDistance = Convert.ToDouble(this.textBox_MaxSearch.Text);
                 axis.homePara.acc = Convert.ToDouble(this.textBox_HomeAcc.Text);
                 axis.homePara.vel = Convert.ToDouble(this.textBox_HomeVel.Text);
-                axis.homePara.offset = Convert.ToDouble(this.textBox_Offset.Text);
                 axis.homePara.maxSeconds = Convert.ToDouble(this.textBox_HomeTimeout.Text);
 
                 axis.motionPara.acc = Convert.ToDouble(this.textBox_Acc.Text);

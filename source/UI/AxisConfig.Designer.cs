@@ -32,7 +32,6 @@
             this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.textBox_Name = new System.Windows.Forms.TextBox();
-            this.label3 = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
             this.textBox_HomeAcc = new System.Windows.Forms.TextBox();
             this.label5 = new System.Windows.Forms.Label();
@@ -45,9 +44,10 @@
             this.textBox_Pulse = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
-            this.label11 = new System.Windows.Forms.Label();
-            this.textBox_Offset = new System.Windows.Forms.TextBox();
-            this.comboBox_Home = new System.Windows.Forms.ComboBox();
+            this.textBox_MaxSearch = new System.Windows.Forms.TextBox();
+            this.label14 = new System.Windows.Forms.Label();
+            this.comboBox_Dir = new System.Windows.Forms.ComboBox();
+            this.label13 = new System.Windows.Forms.Label();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
             this.textBox_Acc = new System.Windows.Forms.TextBox();
             this.label7 = new System.Windows.Forms.Label();
@@ -97,27 +97,18 @@
             this.textBox_Name.TabIndex = 2;
             this.textBox_Name.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(8, 28);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(56, 17);
-            this.label3.TabIndex = 5;
-            this.label3.Text = "回零方式";
-            // 
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(8, 54);
+            this.label4.Location = new System.Drawing.Point(8, 80);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(103, 17);
+            this.label4.Size = new System.Drawing.Size(114, 17);
             this.label4.TabIndex = 7;
-            this.label4.Text = "回零加速度(m/s²)";
+            this.label4.Text = "回零加速度(mm/s²)";
             // 
             // textBox_HomeAcc
             // 
-            this.textBox_HomeAcc.Location = new System.Drawing.Point(125, 50);
+            this.textBox_HomeAcc.Location = new System.Drawing.Point(123, 76);
             this.textBox_HomeAcc.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.textBox_HomeAcc.Name = "textBox_HomeAcc";
             this.textBox_HomeAcc.Size = new System.Drawing.Size(116, 23);
@@ -127,15 +118,15 @@
             // label5
             // 
             this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(8, 82);
+            this.label5.Location = new System.Drawing.Point(8, 108);
             this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(86, 17);
+            this.label5.Size = new System.Drawing.Size(97, 17);
             this.label5.TabIndex = 9;
-            this.label5.Text = "回零速度(m/s)";
+            this.label5.Text = "回零速度(mm/s)";
             // 
             // textBox_HomeVel
             // 
-            this.textBox_HomeVel.Location = new System.Drawing.Point(125, 78);
+            this.textBox_HomeVel.Location = new System.Drawing.Point(123, 104);
             this.textBox_HomeVel.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.textBox_HomeVel.Name = "textBox_HomeVel";
             this.textBox_HomeVel.Size = new System.Drawing.Size(116, 23);
@@ -145,7 +136,7 @@
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(8, 137);
+            this.label6.Location = new System.Drawing.Point(8, 136);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(70, 17);
             this.label6.TabIndex = 11;
@@ -153,7 +144,7 @@
             // 
             // textBox_HomeTimeout
             // 
-            this.textBox_HomeTimeout.Location = new System.Drawing.Point(125, 132);
+            this.textBox_HomeTimeout.Location = new System.Drawing.Point(123, 131);
             this.textBox_HomeTimeout.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.textBox_HomeTimeout.Name = "textBox_HomeTimeout";
             this.textBox_HomeTimeout.Size = new System.Drawing.Size(116, 23);
@@ -217,57 +208,64 @@
             // 
             // groupBox2
             // 
-            this.groupBox2.Controls.Add(this.label11);
-            this.groupBox2.Controls.Add(this.textBox_Offset);
-            this.groupBox2.Controls.Add(this.comboBox_Home);
-            this.groupBox2.Controls.Add(this.label3);
+            this.groupBox2.Controls.Add(this.textBox_MaxSearch);
+            this.groupBox2.Controls.Add(this.label14);
+            this.groupBox2.Controls.Add(this.comboBox_Dir);
+            this.groupBox2.Controls.Add(this.label13);
             this.groupBox2.Controls.Add(this.label6);
             this.groupBox2.Controls.Add(this.textBox_HomeAcc);
             this.groupBox2.Controls.Add(this.textBox_HomeTimeout);
             this.groupBox2.Controls.Add(this.label4);
             this.groupBox2.Controls.Add(this.label5);
             this.groupBox2.Controls.Add(this.textBox_HomeVel);
-            this.groupBox2.Location = new System.Drawing.Point(14, 159);
+            this.groupBox2.Location = new System.Drawing.Point(267, 17);
             this.groupBox2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.groupBox2.Name = "groupBox2";
             this.groupBox2.Padding = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.groupBox2.Size = new System.Drawing.Size(247, 166);
+            this.groupBox2.Size = new System.Drawing.Size(247, 162);
             this.groupBox2.TabIndex = 13;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "回零设置";
             // 
-            // label11
+            // textBox_MaxSearch
             // 
-            this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(8, 111);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(73, 17);
-            this.label11.TabIndex = 14;
-            this.label11.Text = "Offset(mm)";
+            this.textBox_MaxSearch.Location = new System.Drawing.Point(123, 48);
+            this.textBox_MaxSearch.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.textBox_MaxSearch.Name = "textBox_MaxSearch";
+            this.textBox_MaxSearch.Size = new System.Drawing.Size(116, 23);
+            this.textBox_MaxSearch.TabIndex = 17;
+            this.textBox_MaxSearch.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             // 
-            // textBox_Offset
+            // label14
             // 
-            this.textBox_Offset.Location = new System.Drawing.Point(125, 106);
-            this.textBox_Offset.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.textBox_Offset.Name = "textBox_Offset";
-            this.textBox_Offset.Size = new System.Drawing.Size(116, 23);
-            this.textBox_Offset.TabIndex = 13;
-            this.textBox_Offset.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(8, 52);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(110, 17);
+            this.label14.TabIndex = 18;
+            this.label14.Text = "最大搜索距离(mm)";
             // 
-            // comboBox_Home
+            // comboBox_Dir
             // 
-            this.comboBox_Home.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.comboBox_Home.FormattingEnabled = true;
-            this.comboBox_Home.Items.AddRange(new object[] {
-            "ORG",
-            "Index",
-            "Probe",
-            "ORG/Index"});
-            this.comboBox_Home.Location = new System.Drawing.Point(125, 22);
-            this.comboBox_Home.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.comboBox_Home.Name = "comboBox_Home";
-            this.comboBox_Home.Size = new System.Drawing.Size(116, 25);
-            this.comboBox_Home.TabIndex = 12;
+            this.comboBox_Dir.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBox_Dir.FormattingEnabled = true;
+            this.comboBox_Dir.Items.AddRange(new object[] {
+            "正方向",
+            "负方向"});
+            this.comboBox_Dir.Location = new System.Drawing.Point(123, 15);
+            this.comboBox_Dir.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.comboBox_Dir.Name = "comboBox_Dir";
+            this.comboBox_Dir.Size = new System.Drawing.Size(116, 25);
+            this.comboBox_Dir.TabIndex = 16;
+            // 
+            // label13
+            // 
+            this.label13.AutoSize = true;
+            this.label13.Location = new System.Drawing.Point(9, 25);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(56, 17);
+            this.label13.TabIndex = 15;
+            this.label13.Text = "回零方向";
             // 
             // groupBox3
             // 
@@ -277,14 +275,14 @@
             this.groupBox3.Controls.Add(this.textBox_Vel);
             this.groupBox3.Controls.Add(this.textBox_Timeout);
             this.groupBox3.Controls.Add(this.label9);
-            this.groupBox3.Location = new System.Drawing.Point(279, 17);
+            this.groupBox3.Location = new System.Drawing.Point(14, 162);
             this.groupBox3.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.Padding = new System.Windows.Forms.Padding(3, 4, 3, 4);
-            this.groupBox3.Size = new System.Drawing.Size(247, 106);
+            this.groupBox3.Size = new System.Drawing.Size(247, 101);
             this.groupBox3.TabIndex = 14;
             this.groupBox3.TabStop = false;
-            this.groupBox3.Text = "运动设置";
+            this.groupBox3.Text = "默认运动设置";
             // 
             // textBox_Acc
             // 
@@ -300,9 +298,9 @@
             this.label7.AutoSize = true;
             this.label7.Location = new System.Drawing.Point(8, 23);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(79, 17);
+            this.label7.Size = new System.Drawing.Size(90, 17);
             this.label7.TabIndex = 5;
-            this.label7.Text = "加速度(m/s²)";
+            this.label7.Text = "加速度(mm/s²)";
             // 
             // label8
             // 
@@ -334,15 +332,15 @@
             // label9
             // 
             this.label9.AutoSize = true;
-            this.label9.Location = new System.Drawing.Point(8, 49);
+            this.label9.Location = new System.Drawing.Point(8, 50);
             this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(86, 17);
+            this.label9.Size = new System.Drawing.Size(97, 17);
             this.label9.TabIndex = 7;
-            this.label9.Text = "最大速度(m/s)";
+            this.label9.Text = "最大速度(mm/s)";
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(433, 281);
+            this.button1.Location = new System.Drawing.Point(419, 230);
             this.button1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(87, 33);
@@ -355,7 +353,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(534, 333);
+            this.ClientSize = new System.Drawing.Size(518, 266);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.groupBox2);
@@ -381,7 +379,6 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.TextBox textBox_Name;
-        private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox textBox_HomeAcc;
         private System.Windows.Forms.Label label5;
@@ -400,10 +397,11 @@
         private System.Windows.Forms.TextBox textBox_Timeout;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.Button button1;
-        private System.Windows.Forms.ComboBox comboBox_Home;
-        private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.TextBox textBox_Offset;
         private System.Windows.Forms.TextBox textBox_CardNo;
         private System.Windows.Forms.Label label12;
+        private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.ComboBox comboBox_Dir;
+        private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.TextBox textBox_MaxSearch;
     }
 }

@@ -21,6 +21,29 @@ namespace MotionControl
         private Bitmap _bitGray;//无状态单色图
         private Bitmap _bitRed;//红色状态单色图
         private Bitmap _bitMagent; //
+        /// <summary>
+        /// 获取或设置定时器更新频率，单位ms。当设定值小于等于0时，则关闭定时器
+        /// </summary>
+        public int TimerInterval
+        {
+            get
+            {
+                return timer1.Interval;
+            }
+            set
+            {
+                if (value <= 0)
+                {
+                    this.timer1.Enabled = false;
+                }
+                else
+                {
+                    this.timer1.Enabled = true;
+                    timer1.Interval = value;
+                }
+            }
+        }
+
         private Bitmap _GenColorImage(Color color)
         {
             Bitmap bitmap_color = new Bitmap(dataGridView_Axis.Columns[5].Width / 2, dataGridView_Axis.RowTemplate.Height / 2);
@@ -59,6 +82,11 @@ namespace MotionControl
         public DebugUi()
         {
             InitializeComponent();
+            this.Text += Motion.Version;
+            this.toolStripStatusLabel2.Text = Motion.Version;
+            tabControl1.SelectedIndex = 0;
+
+
             this.toolStripStatusLabel_Time.Text = System.DateTime.Now.ToLongTimeString();
             int i, j = 0;
             //轴
@@ -68,11 +96,11 @@ namespace MotionControl
             _bitGreen = _GenColorImage(Color.Green);
             _bitGray = _GenColorImage(Color.LightGray);
             _bitRed = _GenColorImage(Color.Red);
-            _bitMagent = _GenColorImage(Color.DarkMagenta);           
+            _bitMagent = _GenColorImage(Color.DarkMagenta);
             for (i = 0; i < Motion.AxisNum; i++)
             {
-                j = 0;                
-               // this.dataGridView_Axis.Rows[i].HeaderCell.Value = i.ToString();
+                j = 0;
+                // this.dataGridView_Axis.Rows[i].HeaderCell.Value = i.ToString();
                 this.dataGridView_Axis.Rows[i].Cells[j++].Value = i.ToString();
                 this.dataGridView_Axis.Rows[i].Cells[j++].Value = Motion.Axis(i).name;
                 this.dataGridView_Axis.Rows[i].Cells[j++].Value = "0.000";
@@ -85,21 +113,28 @@ namespace MotionControl
             if (Motion.DioNum <= 0)
             {
                 this.tabPage2.Parent = null;
-                return;
-            }            
-            this.dataGridView_IO.Rows.Clear();
-            this.dataGridView_IO.Rows.Add(Motion.DioNum);            
+            }
+            else
+            {
+                this.dataGridView_IO.Rows.Clear();
+                this.dataGridView_IO.Rows.Add(Motion.DioNum);
+            }
+            this.timer1.Enabled = true;
         }
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            int j = 0;
+            if (!this.Visible)
+            {
+                return;
+            }
+
             switch (tabControl1.SelectedIndex)
             {
                 case 0:
                     for (int i = 0; i < Motion.AxisNum; i++)
                     {
-                        j = 2;
+                        int j = 2;
                         MotionIO mio_ = Motion.Axis(i).MIO;
                         this.dataGridView_Axis.Rows[i].Cells[j++].Value = Motion.Axis(i).CmdPos.ToString("F3");
                         this.dataGridView_Axis.Rows[i].Cells[j++].Value = Motion.Axis(i).FbkPos.ToString("F3");
@@ -114,8 +149,8 @@ namespace MotionControl
                 case 1:
                     for (int i = 0; i < Motion.DioNum; i++)
                     {
-                        j = 5;
-                        this.dataGridView_IO.Rows[i].Cells[j++].Value = Motion.Dio(i).Bit? _bitGray : _bitGreen;
+                        int j = 5;
+                        this.dataGridView_IO.Rows[i].Cells[j++].Value = Motion.Dio(i).Bit ? _bitGreen : _bitGray;
                         this.dataGridView_IO.Rows[i].Cells[j++].ReadOnly = !Motion.Dio(i).ouput;
                     }
                     break;
@@ -131,13 +166,13 @@ namespace MotionControl
                 if (e.RowIndex < 0 || e.RowIndex >= Motion.AxisNum)
                 {
                     return;
-                }                
+                }
                 switch (e.ColumnIndex)
                 {
                     case 9:
                         bool cmd_ = Convert.ToBoolean(this.dataGridView_Axis.Rows[e.RowIndex].Cells[e.ColumnIndex].EditedFormattedValue);
                         int err = Motion.Axis(e.RowIndex).SetEnabled(cmd_);
-                        _showDebugInfo(err, (cmd_?"Servo ON!":"Servo OFF!"));
+                        _showDebugInfo(err, (cmd_ ? "Servo ON!" : "Servo OFF!"));
                         break;
                     case 10:
                         AxisConfig a = new AxisConfig(e.RowIndex);
@@ -148,7 +183,7 @@ namespace MotionControl
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
-            }            
+            }
         }
 
         private void button_Clear_Click(object sender, EventArgs e)
@@ -227,7 +262,7 @@ namespace MotionControl
                 Motion.SaveDioPara();
                 _showDebugInfo(0, "全部IO信息保存成功！");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
@@ -263,7 +298,7 @@ namespace MotionControl
         private void dataGridView_IO_SelectionChanged(object sender, EventArgs e)
         {
             if (dataGridView_IO.CurrentRow.Index < 0 || dataGridView_IO.CurrentRow.Index >= Motion.DioNum)
-            {                
+            {
                 return;
             }
             dioId_ = dataGridView_IO.CurrentRow.Index;
@@ -273,10 +308,9 @@ namespace MotionControl
         {
             if (tabControl1.SelectedIndex == 1)
             {
-                int j = 0;
                 for (int i = 0; i < Motion.DioNum; i++)
                 {
-                    j = 0;
+                    int j = 0;
                     this.dataGridView_IO.Rows[i].Cells[j++].Value = i.ToString();
                     this.dataGridView_IO.Rows[i].Cells[j++].Value = Motion.Dio(i).name;
                     this.dataGridView_IO.Rows[i].Cells[j++].Value = Motion.Dio(i).cardId.ToString();
